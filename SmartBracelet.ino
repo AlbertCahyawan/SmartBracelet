@@ -1,12 +1,7 @@
 #include <ESP8266WiFi.h> 
 #include <ESP8266WebServer.h> 
 #include <ESP8266Ping.h>
-
-///// De :  http://www.esp8266.com/viewtopic.php?f=32&t=5669&start=4#sthash.OFdvQdJF.dpuf ///
-extern "C" {
-#include<user_interface.h>
-}
-
+  
 /* configuration  wifi */ 
 
 IPAddress local_IP(192,168,4,2);
@@ -14,195 +9,127 @@ IPAddress gateway(192,168,4,1);
 IPAddress subnet(255,255,255,0);
 const char* ServerName = "SmartSam";
 const char* ServerPassword = "12345678";
-float distance = 0;
 
+double distance ;
+
+long rssi ;
 IPAddress ClientIp;
 
 
 ESP8266WebServer server(80);
+ 
 
-void handleRoot() {
-  server.send(200, "text/html", "<h1>You are connected</h1>");
-  //String addy = server.client().remoteIP().toString();
-  //Serial.println(addy);
-}
+const char* ssid     = "AlbertWifi";
+const char* password = "3496BEF9";
+ 
+int red = 14;
+int yellow = 4;
+int blue = 5;
 
 void setup() {
-  delay(1000);
-  Serial.begin(115200); //Start communication between the ESP8266-12E and the monitor window
+  Serial.begin(115200);
+  delay(10);
+
+  //Setting up pin 
+  pinMode(red, OUTPUT);
+  pinMode(yellow, OUTPUT);
+  pinMode(blue, OUTPUT);
+
+  // We start by connecting to a WiFi network
+  
   Serial.println();
-  Serial.print("Configuring access point...");
-
-  //WiFi.mode(WIFI_AP); //Our ESP8266-12E is an AccessPoint
-  WiFi.softAPConfig(local_IP, gateway, subnet);
-  WiFi.softAP(ServerName);
-  //WiFi.softAP(ServerName, ServerPassword); // Provide the (SSID, password); 
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
   
-  IPAddress myIP = WiFi.softAPIP(); // Obtain the IP of the Server
-  Serial.print("AP IP address: "); // Print the IP to the monitor window
-  Serial.println(myIP); 
-  printMacAddress();
-  server.on("/", handleRoot);
-  server.begin(); // Start the HTTP Server
-  Serial.println("HTTP server started"); 
- 
+  /* Explicitly set the ESP8266 to be a WiFi-client, otherwise, it by default,
+     would try to act as both a client and an access-point and could cause
+     network-issues with your other WiFi-devices on your WiFi-network. */
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
   
-  pinMode(LED_BUILTIN, OUTPUT); //GPIO16 is an OUTPUT pin;
-  digitalWrite(LED_BUILTIN, LOW); //Initial state is ON
-} 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    TurnOnred();
+  }
 
-void loop() {
-  server.handleClient();   
-  delay(1000);
-  client_status();
-  delay(1000);
+  Serial.println("");
+  Serial.println("WiFi connected");  
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP()); 
+  
 }
 
-void client_status() {
+int value = 0;
 
-unsigned char number_client;
-struct station_info *stat_info;
+void loop() {  
 
+  delay(2000);
+   
+  if(WiFi.status()== WL_CONNECTED) { 
+     Serial.println("Wifi Connected");  
+     rssi = WiFi.RSSI();
+     Serial.print("RSSI:");
+     Serial.print(rssi);
+     Serial.println("dbm") ; 
+   
+     distance = ((27.55 - (20 * log10(2412)) + ((-1)*rssi)  )/20);
+     distance = pow(10,distance);
+     Serial.print("distance:");
+     Serial.print( distance);
+     Serial.println("m") ; 
+     if(distance >= 0 && distance < 5){
+      Serial.println("dekat") ;
+      TurnOnblue();
+     }
+      if(distance >= 5 && distance < 15){
+      Serial.println("agak jauh") ;
+      TurnOnyellow();
+     }
+      if(distance >= 15){
+      Serial.println("jauh") ;
+      TurnOnred();
+     }
+  }
+  else{ 
+    Serial.println("Wifi DisConnected");  
+    Serial.println("terputus/sangat jauh") ;
+    TurnOnred();
+  }  
+} 
 
-int32_t SignalStrenght ;
-struct ip_addr *IPaddress;
-IPAddress address;
-int i=1;
+void TurnOnblue(){  
+  // turn off red and yellow, then turn on blue
+    digitalWrite(yellow, LOW);
+    digitalWrite(red, LOW);
+    digitalWrite(blue, HIGH); 
+}
 
-number_client= wifi_softap_get_station_num(); // Count of stations which are connected to ESP8266 soft-AP
-stat_info = wifi_softap_get_station_info();  
+void TurnOnyellow(){  
+  // turn off red and blue then turn on yellow
+    digitalWrite(yellow, HIGH);
+    digitalWrite(red, LOW);
+    digitalWrite(blue, LOW); 
+}
 
-
-
-Serial.print(" Total connected_client are = ");
-Serial.println(number_client);
-
-while (stat_info != NULL) {
+void TurnOnred(){  
+  // turn off blue and yellow, then turn on red
+    digitalWrite(yellow, LOW);
+    digitalWrite(red, HIGH);
+    digitalWrite(blue, LOW); 
+}
   
-digitalWrite(LED_BUILTIN, HIGH);//Turn off the light 
-
-IPaddress = &stat_info->ip;
-address = IPaddress->addr;
-ClientIp = address;
-
-//SignalStrenght ;  
- 
-
-bool ret = Ping.ping(ClientIp); 
- 
-float avg_time_ms =  float(Ping.averageTime());
-distance = ((avg_time_ms/2)*0.3);
-//distance = pow(10,((27.55 - (20 * log(1)) + 1 )/20));
-//((avg_time_ms/2)*299792,458);  
-
 // distance = 10 ^ ((27.55 - (20 * log10(frequency)) + signalLevel)/20)
-
-
-Serial.print("client= ");
-
-Serial.print(i);
-Serial.print(" ip adress is = ");
-Serial.print((ClientIp));
-Serial.print(" with mac adress is = ");
-
-Serial.print(stat_info->bssid[0],HEX);
-Serial.print(stat_info->bssid[1],HEX);
-Serial.print(stat_info->bssid[2],HEX);
-Serial.print(stat_info->bssid[3],HEX);
-Serial.print(stat_info->bssid[4],HEX);
-Serial.print(stat_info->bssid[5],HEX);
-
-Serial.println("");
-Serial.print("Client Time= ");
-Serial.print(avg_time_ms);
-Serial.print("ms");
-Serial.println("");
-Serial.print("Client Distance= ");
-Serial.print(distance);
-Serial.print("m");
-
-stat_info = STAILQ_NEXT(stat_info, next);
-i++;
-Serial.println();
-}
-
-if(number_client == 0){
-digitalWrite(LED_BUILTIN, LOW);//Turn on the light
-}
-
-delay(500);
-} 
-
-//Separator
-
-void printMacAddress() {
-  // the MAC address of your Wifi shield
-  byte mac[6];
-
-  // print your MAC address:
-  WiFi.macAddress(mac);
-  Serial.print("MAC: ");
-  Serial.print(mac[5], HEX);
-  Serial.print(":");
-  Serial.print(mac[4], HEX);
-  Serial.print(":");
-  Serial.print(mac[3], HEX);
-  Serial.print(":");
-  Serial.print(mac[2], HEX);
-  Serial.print(":");
-  Serial.print(mac[1], HEX);
-  Serial.print(":");
-  Serial.println(mac[0], HEX);
-}
-
-void listNetworks() {
-  // scan for nearby networks:
-  Serial.println("** Scan Networks **");
-  int numSsid = WiFi.scanNetworks();
-  if (numSsid == -1) {
-    Serial.println("Couldn't get a wifi connection");
-    while (true);
-  }
-
-  // print the list of networks seen:
-  Serial.print("number of available networks:");
-  Serial.println(numSsid);
-
-  // print the network number and name for each network found:
-  for (int thisNet = 0; thisNet < numSsid; thisNet++) {
-    Serial.print(thisNet);
-    Serial.print(") ");
-    Serial.print(WiFi.SSID(thisNet));
-    Serial.print("\tSignal: ");
-    Serial.print(WiFi.RSSI(thisNet));
-    Serial.print(" dBm");
-    Serial.print("\tEncryption: ");
-    printEncryptionType(WiFi.encryptionType(thisNet));
-  }
-}
-
-void printEncryptionType(int thisType) {
-  // read the encryption type and print out the name:
-  switch (thisType) {
-    case ENC_TYPE_WEP:
-      Serial.println("WEP");
-      break;
-    case ENC_TYPE_TKIP:
-      Serial.println("WPA");
-      break;
-    case ENC_TYPE_CCMP:
-      Serial.println("WPA2");
-      break;
-    case ENC_TYPE_NONE:
-      Serial.println("None");
-      break;
-    case ENC_TYPE_AUTO:
-      Serial.println("Auto");
-      break;
-  }
-}  
+ 
 //Chip ID = 008E9B2F
 //MAC: 2F:9B:8E:7F:CF:5C
+
+
+
+ 
+
+
 
 
 
