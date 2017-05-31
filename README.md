@@ -1,5 +1,7 @@
 # Arduino Distance Detector Using Wi-Fi Sensor (Smart-Sam)
 
+![persasive](https://cloud.githubusercontent.com/assets/12613854/26640231/5cf13fba-4651-11e7-92eb-6bbcb78b797c.png)
+
 COMP6124 - Pervasive Computing
 Class 2016/2017
 Computer Science Program
